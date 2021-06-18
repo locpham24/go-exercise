@@ -16,7 +16,6 @@ type Fetcher interface {
 
 var mapUrlIsFetched = make(map[string]bool)
 var chanResult = make(chan string, 1)
-
 func Crawl(url string, depth int, fetcher Fetcher) {
 	// TODO: Fetch URLs in parallel.
 	// TODO: Don't fetch the same URL twice.
@@ -25,31 +24,37 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 		return
 	}
 
-	if _, ok := mapUrlIsFetched[url]; ok {
-		return
-	}
-	
 	mapUrlIsFetched[url] = true
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	result := fmt.Sprintf("found: %s %q \n", url, body)
 	chanResult <- result
 	for _, u := range urls {
+		if _, ok := mapUrlIsFetched[u]; ok {
+			continue
+		}
 		go Crawl(u, depth-1, fetcher)
 	}
 
-	fmt.Println(<-chanResult)
 
 	return
 }
 
 func main() {
 	Crawl("https://golang.org/", 4, fetcher)
-	time.Sleep(10 * time.Second)
-	fmt.Println(1 + 1)
+	for {
+		select {
+		case s:= <-chanResult:
+			fmt.Println(s)
+		case <-time.After(1 * time.Second):
+			fmt.Println("quit")
+			return
+		}
+	}
 }
 
 // fakeFetcher is Fetcher that returns canned results.
@@ -100,4 +105,3 @@ var fetcher = fakeFetcher{
 		},
 	},
 }
-
